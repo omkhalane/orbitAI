@@ -1,0 +1,142 @@
+<svg viewBox="0 0 1000 1000" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <!-- Torus Main Gradient -->
+    <linearGradient id="orbitTorusGrad" x1="200" y1="180" x2="800" y2="820" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#38bdf8" />
+      <stop offset="22%" stop-color="#0284c7" />
+      <stop offset="45%" stop-color="#1d4ed8" />
+      <stop offset="70%" stop-color="#6366f1" />
+      <stop offset="85%" stop-color="#a855f7" />
+      <stop offset="100%" stop-color="#d946ef" />
+    </linearGradient>
+
+    <!-- Torus Radial Depth Highlight -->
+    <radialGradient id="torusHighlight" cx="360" cy="300" r="420" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#7dd3fc" stop-opacity="0.95" />
+      <stop offset="35%" stop-color="#38bdf8" stop-opacity="0.6" />
+      <stop offset="70%" stop-color="#2563eb" stop-opacity="0" />
+    </radialGradient>
+
+    <!-- Torus Shadow / Ambient Occlusion -->
+    <radialGradient id="torusInnerShadow" cx="500" cy="500" r="280" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#0f172a" stop-opacity="0" />
+      <stop offset="65%" stop-color="#1e1b4b" stop-opacity="0.25" />
+      <stop offset="100%" stop-color="#311042" stop-opacity="0.5" />
+    </radialGradient>
+
+    <!-- Bottom Rim Glow Magenta/Violet -->
+    <linearGradient id="bottomRimGlow" x1="350" y1="650" x2="720" y2="780" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#3b82f6" />
+      <stop offset="40%" stop-color="#8b5cf6" />
+      <stop offset="80%" stop-color="#d946ef" />
+      <stop offset="100%" stop-color="#f472b6" />
+    </linearGradient>
+
+    <!-- Planetary Swoosh Ring Gradient -->
+    <linearGradient id="planetaryRingGrad" x1="120" y1="600" x2="870" y2="440" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#38bdf8" />
+      <stop offset="35%" stop-color="#60a5fa" />
+      <stop offset="65%" stop-color="#c084fc" />
+      <stop offset="90%" stop-color="#f472b6" />
+      <stop offset="100%" stop-color="#fbcfe8" />
+    </linearGradient>
+
+    <!-- Satellite Sphere Radial Gradient -->
+    <radialGradient id="sphereGrad" cx="740" cy="230" r="100" fx="715" fy="205" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#67e8f9" />
+      <stop offset="25%" stop-color="#38bdf8" />
+      <stop offset="55%" stop-color="#6366f1" />
+      <stop offset="80%" stop-color="#9333ea" />
+      <stop offset="100%" stop-color="#c026d3" />
+    </radialGradient>
+
+    <!-- Soft Drop Shadows -->
+    <filter id="softGlow" x="-10%" y="-10%" width="120%" height="120%">
+      <feGaussianBlur stdDeviation="16" result="blur" />
+      <feComposite in="SourceGraphic" in2="blur" operator="over" />
+    </filter>
+
+    <filter id="ringShadow" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="0" dy="12" stdDeviation="14" flood-color="#1e1b4b" flood-opacity="0.25" />
+    </filter>
+  </defs>
+
+  <!-- Group with subtle 3D tilt -->
+  <g transform="translate(0, 0)">
+    <!-- Back portion of the planetary ring (behind torus) -->
+    <path d="M 680 340 C 760 385 860 415 865 435 C 870 455 830 485 760 520 L 730 500 C 790 470 820 450 815 440 C 810 430 730 405 660 370 Z" fill="url(#planetaryRingGrad)" opacity="0.45" />
+
+    <!-- Main 3D Torus Body -->
+    <!-- Outer boundary of Torus -->
+    <path fill-rule="evenodd" clip-rule="evenodd" d="
+      M 500 190 
+      C 680 190 800 325 800 505 
+      C 800 685 665 820 485 820 
+      C 305 820 180 690 180 510 
+      C 180 330 320 190 500 190 Z
+      M 485 345
+      C 385 345 315 425 315 520
+      C 315 615 390 685 490 685
+      C 590 685 660 610 660 515
+      C 660 420 585 345 485 345 Z
+    " fill="url(#orbitTorusGrad)" />
+
+    <!-- 3D Volumetric Lighting Over Torus -->
+    <path fill-rule="evenodd" clip-rule="evenodd" d="
+      M 500 190 
+      C 680 190 800 325 800 505 
+      C 800 685 665 820 485 820 
+      C 305 820 180 690 180 510 
+      C 180 330 320 190 500 190 Z
+      M 485 345
+      C 385 345 315 425 315 520
+      C 315 615 390 685 490 685
+      C 590 685 660 610 660 515
+      C 660 420 585 345 485 345 Z
+    " fill="url(#torusHighlight)" opacity="0.85" />
+
+    <!-- Torus Inner Rim Bevel & Depth -->
+    <path fill-rule="evenodd" clip-rule="evenodd" d="
+      M 485 345
+      C 385 345 315 425 315 520
+      C 315 615 390 685 490 685
+      C 590 685 660 610 660 515
+      C 660 420 585 345 485 345 Z
+    " fill="url(#torusInnerShadow)" />
+
+    <!-- Lower Torus Volumetric Shadow / Glow Curve -->
+    <path d="M 230 580 C 270 730 400 810 520 810 C 650 810 770 720 780 590 C 760 690 650 780 515 780 C 385 780 270 700 230 580 Z" fill="url(#bottomRimGlow)" opacity="0.9" />
+
+    <!-- Inner Hole Top Crescent Highlight (Gives the 3D donut depth) -->
+    <path d="M 330 510 C 340 430 400 365 485 360 C 570 355 640 410 650 490 C 625 435 565 385 485 385 C 405 385 345 440 330 510 Z" fill="#ffffff" opacity="0.35" />
+
+    <!-- Front swooping Planetary Ring (sweeps in front of Torus) -->
+    <path d="
+      M 125 615
+      C 160 575 220 550 320 570
+      C 440 595 620 560 760 440
+      C 825 385 860 375 865 395
+      C 870 415 825 470 740 525
+      C 580 630 380 665 240 645
+      C 170 635 130 630 125 615 Z
+    " fill="url(#planetaryRingGrad)" filter="url(#ringShadow)" />
+
+    <!-- Specular highlight on planetary ring swoosh -->
+    <path d="
+      M 140 615
+      C 200 580 320 575 440 595
+      C 580 618 710 565 790 480
+      C 740 535 620 585 480 580
+      C 340 575 210 595 140 615 Z
+    " fill="#ffffff" opacity="0.65" />
+
+    <!-- Floating Orbiting Satellite Sphere at top right -->
+    <g filter="url(#ringShadow)">
+      <!-- Sphere Body -->
+      <circle cx="765" cy="270" r="88" fill="url(#sphereGrad)" />
+      <!-- Specular 3D Glint on Sphere -->
+      <ellipse cx="735" cy="235" rx="36" ry="24" transform="rotate(-30 735 235)" fill="#ffffff" opacity="0.45" />
+      <circle cx="725" cy="225" r="8" fill="#ffffff" opacity="0.8" />
+    </g>
+  </g>
+</svg>

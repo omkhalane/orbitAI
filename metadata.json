@@ -1,0 +1,6 @@
+{
+  "name": "Orbit AI",
+  "description": "Unified AI productivity assistant that connects your apps, conversations, files, and tasks.",
+  "requestFramePermissions": ["microphone"],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

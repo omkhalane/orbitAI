@@ -1,0 +1,94 @@
+{
+  "users": {
+    "usr_bed860c7c9dbd3fc": {
+      "id": "usr_bed860c7c9dbd3fc",
+      "email": "test@orbit.ai",
+      "firstName": "test",
+      "lastName": "",
+      "callName": "test",
+      "avatar": "https://api.dicebear.com/7.x/initials/svg?seed=test%40orbit.ai&backgroundColor=8b5cf6",
+      "provider": "email",
+      "onboardingCompleted": false,
+      "createdAt": "2026-09-18T11:01:01.236Z",
+      "updatedAt": "2026-09-18T11:01:01.236Z"
+    }
+  },
+  "sessions": {
+    "d6799dc13423637b31465ea0192b5587c60526976254e82e6ebb438466a14d9a": {
+      "id": "ses_7e24453b01e4eccb",
+      "token": "d6799dc13423637b31465ea0192b5587c60526976254e82e6ebb438466a14d9a",
+      "userId": "usr_bed860c7c9dbd3fc",
+      "expiresAt": 1790938861237,
+      "createdAt": "2026-09-18T11:01:01.237Z"
+    }
+  },
+  "otps": {},
+  "integrations": {},
+  "conversations": {},
+  "messages": {},
+  "memories": {},
+  "tasks": {},
+  "scheduledTasks": {},
+  "agents": {
+    "usr_bed860c7c9dbd3fc": [
+      {
+        "id": "agt_67e57e3bef13",
+        "userId": "usr_bed860c7c9dbd3fc",
+        "name": "Email Assistant",
+        "description": "Triage inboxes, draft responses, and surface urgent follow-ups",
+        "instructions": "Act as an executive communication assistant. Group emails by urgency and draft concise, courteous responses.",
+        "tools": [
+          "search_gmail",
+          "get_email",
+          "draft_email"
+        ],
+        "icon": "Mail",
+        "status": "active",
+        "createdAt": "2026-09-18T11:01:01.236Z"
+      },
+      {
+        "id": "agt_8acfac46952a",
+        "userId": "usr_bed860c7c9dbd3fc",
+        "name": "Daily Planner",
+        "description": "Sync your calendar and tasks into a high-productivity agenda",
+        "instructions": "Analyze today’s schedule, highlight conflicts, buffer focus time, and propose actionable daily priorities.",
+        "tools": [
+          "search_calendar",
+          "create_calendar_event",
+          "search_tasks",
+          "create_task"
+        ],
+        "icon": "Calendar",
+        "status": "active",
+        "createdAt": "2026-09-18T11:01:01.236Z"
+      },
+      {
+        "id": "agt_82e338dd053f",
+        "userId": "usr_bed860c7c9dbd3fc",
+        "name": "Knowledge & Drive Finder",
+        "description": "Cross-reference documents, search memories, and summarize files",
+        "instructions": "Search across connected Drive files and custom memory to synthesize research briefs and answer questions.",
+        "tools": [
+          "search_drive",
+          "get_drive_file",
+          "search_memory"
+        ],
+        "icon": "FileSearch",
+        "status": "active",
+        "createdAt": "2026-09-18T11:01:01.236Z"
+      }
+    ]
+  },
+  "settings": {
+    "usr_bed860c7c9dbd3fc": {
+      "userId": "usr_bed860c7c9dbd3fc",
+      "theme": "light",
+      "responsePreferences": "Concise, clear, and proactive with actionable next steps.",
+      "timezone": "UTC",
+      "emailNotifications": true,
+      "autoTitleEnabled": true,
+      "voiceInputLanguage": "en-US"
+    }
+  },
+  "attachments": {}
+}
