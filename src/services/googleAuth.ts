@@ -1,7 +1,7 @@
 // Google Identity Services & OAuth Helper
 export const GOOGLE_CLIENT_ID = 
   import.meta.env.VITE_GOOGLE_CLIENT_ID || 
-  '609252170522-oj81p9sduooi7fad8o716f3v4d01hvc2.apps.googleusercontent.com';
+  '609252170522-11t71ahmtve9io7speth6e7j0q8lebjk.apps.googleusercontent.com';
 
 export const ALL_GOOGLE_SCOPES = [
   'openid',

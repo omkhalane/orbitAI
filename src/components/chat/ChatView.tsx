@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { OrbitLogo } from '../common/OrbitLogo.tsx';
 import { MessageItem } from './MessageItem.tsx';
 import { ChatComposer } from './ChatComposer.tsx';
+import { ModelSelector } from './ModelSelector.tsx';
 import { useAuth } from '../../context/AuthContext.tsx';
 import { api } from '../../services/api.ts';
 import { 
@@ -16,7 +17,7 @@ import {
   Loader2,
   Check
 } from 'lucide-react';
-import type { ChatMessage, MessageAttachment, Integration } from '../../types/index.ts';
+import type { ChatMessage, MessageAttachment, Integration, CredentialSource } from '../../types/index.ts';
 
 interface ChatViewProps {
   conversationId: string | null;
@@ -34,6 +35,9 @@ export const ChatView: React.FC<ChatViewProps> = ({
   const [loading, setLoading] = useState(false);
   const [isStreaming, setIsStreaming] = useState(false);
   const [integrations, setIntegrations] = useState<Integration[]>([]);
+  const [selectedModelId, setSelectedModelId] = useState<string>('orbit-auto');
+  const [selectedSource, setSelectedSource] = useState<CredentialSource>('orbit');
+  const [activeStreamingModel, setActiveStreamingModel] = useState<string | undefined>(undefined);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   // Load active integrations
@@ -141,6 +145,8 @@ export const ChatView: React.FC<ChatViewProps> = ({
           conversationId: currentConvId,
           message: text,
           attachments,
+          modelId: selectedModelId,
+          credentialSource: selectedSource,
         }),
       });
 
@@ -168,7 +174,9 @@ export const ChatView: React.FC<ChatViewProps> = ({
             try {
               const data = JSON.parse(line.substring(6));
 
-              if (data.type === 'text' && data.content) {
+              if (data.type === 'model_info') {
+                setActiveStreamingModel(data.model);
+              } else if (data.type === 'text' && data.content) {
                 setMessages(prev =>
                   prev.map(m =>
                     m.id === tempAssistantId
@@ -197,10 +205,13 @@ export const ChatView: React.FC<ChatViewProps> = ({
                       target.result = data.payload.result;
                       target.status = data.payload.requiresConfirmation ? 'pending' : 'executed';
                       target.requiresConfirmation = data.payload.requiresConfirmation;
+                      target.approvalId = data.payload.approvalId;
                     }
                     return { ...m, toolCalls: calls };
                   })
                 );
+              } else if (data.type === 'finish') {
+                // Done streaming
               } else if (data.type === 'error') {
                 setMessages(prev =>
                   prev.map(m =>
@@ -227,12 +238,13 @@ export const ChatView: React.FC<ChatViewProps> = ({
       );
     } finally {
       setIsStreaming(false);
+      setActiveStreamingModel(undefined);
     }
   };
 
   // Tool Confirmation handler
-  const handleConfirmToolAction = async (toolName: string, args: Record<string, any>) => {
-    const res = await api.confirmToolAction(toolName, args);
+  const handleConfirmToolAction = async (toolName: string, args: Record<string, any>, approvalId?: string) => {
+    const res = await api.confirmToolAction(toolName, args, approvalId);
     if (res.success) {
       // Re-trigger assistant follow-up
       handleSendMessage(`I confirmed the ${toolName} action. Please proceed.`, []);
@@ -242,8 +254,8 @@ export const ChatView: React.FC<ChatViewProps> = ({
   return (
     <div className="flex-1 flex flex-col h-full bg-gradient-to-b from-white via-[#faf7f9]/60 to-white overflow-hidden">
       {/* Chat Header Bar */}
-      <div className="px-4 py-3 border-b border-slate-100 bg-white/70 backdrop-blur-md flex items-center justify-between z-10">
-        <div className="flex items-center gap-3">
+      <div className="px-4 py-2.5 border-b border-slate-100 bg-white/70 backdrop-blur-md flex items-center justify-between z-10 gap-3">
+        <div className="flex items-center gap-2.5">
           <button
             type="button"
             onClick={onSidebarToggle}
@@ -253,28 +265,47 @@ export const ChatView: React.FC<ChatViewProps> = ({
             <PanelLeft className="w-4 h-4" />
           </button>
 
-          <div className="flex items-center gap-2">
-            <span className="text-xs font-bold text-slate-900">Orbit Assistant</span>
+          <div className="flex items-center gap-1.5">
+            <span className="text-xs font-bold text-slate-900">Orbit AI</span>
             <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
           </div>
+
+          <div className="h-4 w-px bg-slate-200" />
+
+          {/* Model Selector Pill */}
+          <ModelSelector
+            selectedModelId={selectedModelId}
+            selectedSource={selectedSource}
+            onSelectModel={setSelectedModelId}
+            onSelectSource={setSelectedSource}
+            activeStreamingModel={activeStreamingModel}
+            onOpenSettings={() => {
+              window.dispatchEvent(new CustomEvent('orbit:navigate_settings', { detail: { tab: 'ai_keys' } }));
+            }}
+          />
         </div>
 
         {/* Connected Apps Status Bar */}
         <div className="hidden sm:flex items-center gap-2">
-          <span className="text-[11px] text-slate-400 font-medium">Connected tools:</span>
+          <span className="text-[11px] text-slate-400 font-medium">Tools:</span>
           {integrations.length === 0 ? (
-            <span className="text-[11px] text-slate-400 italic">None active</span>
+            <span className="text-[11px] text-slate-400 italic">None connected</span>
           ) : (
-            <div className="flex items-center gap-1.5">
-              {integrations.map((item) => (
+            <div className="flex items-center gap-1.5 overflow-x-auto max-w-xs">
+              {integrations.slice(0, 3).map((item) => (
                 <span
                   key={item.id}
-                  className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-slate-100 text-slate-700 text-[10px] font-semibold"
+                  className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-slate-100 text-slate-700 text-[10px] font-semibold flex-shrink-0"
                 >
                   <Check className="w-2.5 h-2.5 text-emerald-600" />
                   {item.name}
                 </span>
               ))}
+              {integrations.length > 3 && (
+                <span className="text-[10px] text-slate-400 font-medium">
+                  +{integrations.length - 3}
+                </span>
+              )}
             </div>
           )}
         </div>

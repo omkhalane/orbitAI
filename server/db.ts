@@ -11,8 +11,15 @@ import type {
   ScheduledTask, 
   SpecializedAgent, 
   UserSettings,
-  MessageAttachment
+  MessageAttachment,
+  AiCredential,
+  OAuthConnection,
+  AiUsageRecord,
+  ToolApprovalRequest,
+  AiEntitlement,
+  AiProviderId
 } from '../src/types/index.ts';
+import { encryptSecret, decryptSecret, maskSecret } from './crypto.ts';
 
 export interface UserSession {
   id: string;
@@ -30,6 +37,15 @@ export interface OtpRecord {
   createdAt: string;
 }
 
+export interface StoredAiCredential extends AiCredential {
+  encryptedSecret: string;
+}
+
+export interface StoredOAuthConnection extends OAuthConnection {
+  encryptedAccessToken?: string;
+  encryptedRefreshToken?: string;
+}
+
 interface OrbitDatabase {
   users: Record<string, UserProfile>;
   sessions: Record<string, UserSession>;
@@ -43,6 +59,10 @@ interface OrbitDatabase {
   agents: Record<string, SpecializedAgent[]>; // key is userId
   settings: Record<string, UserSettings>; // key is userId
   attachments: Record<string, MessageAttachment & { userId: string; filePath: string }>;
+  ai_credentials: Record<string, StoredAiCredential[]>; // key is userId
+  oauth_connections: Record<string, StoredOAuthConnection[]>; // key is userId
+  ai_usage: Record<string, AiUsageRecord[]>; // key is userId
+  tool_approvals: Record<string, ToolApprovalRequest>; // key is approvalId
 }
 
 const DATA_DIR = path.resolve(process.cwd(), 'data');
@@ -53,28 +73,33 @@ if (!fs.existsSync(DATA_DIR)) {
 }
 
 function loadDatabase(): OrbitDatabase {
+  let loaded: Partial<OrbitDatabase> = {};
   try {
     if (fs.existsSync(DB_FILE)) {
       const raw = fs.readFileSync(DB_FILE, 'utf-8');
-      return JSON.parse(raw);
+      loaded = JSON.parse(raw);
     }
   } catch (err) {
     console.error('Error loading database, initializing fresh store:', err);
   }
 
   const initialDb: OrbitDatabase = {
-    users: {},
-    sessions: {},
-    otps: {},
-    integrations: {},
-    conversations: {},
-    messages: {},
-    memories: {},
-    tasks: {},
-    scheduledTasks: {},
-    agents: {},
-    settings: {},
-    attachments: {},
+    users: loaded.users || {},
+    sessions: loaded.sessions || {},
+    otps: loaded.otps || {},
+    integrations: loaded.integrations || {},
+    conversations: loaded.conversations || {},
+    messages: loaded.messages || {},
+    memories: loaded.memories || {},
+    tasks: loaded.tasks || {},
+    scheduledTasks: loaded.scheduledTasks || {},
+    agents: loaded.agents || {},
+    settings: loaded.settings || {},
+    attachments: loaded.attachments || {},
+    ai_credentials: loaded.ai_credentials || {},
+    oauth_connections: loaded.oauth_connections || {},
+    ai_usage: loaded.ai_usage || {},
+    tool_approvals: loaded.tool_approvals || {},
   };
 
   saveDatabase(initialDb);
@@ -518,4 +543,251 @@ export function saveAttachmentRecord(record: MessageAttachment & { userId: strin
 
 export function getAttachmentRecord(id: string) {
   return dbInstance.attachments[id];
+}
+
+// --- AI Credentials (BYOK) ---
+export function saveAiCredential(
+  userId: string,
+  provider: AiProviderId,
+  apiKey: string,
+  metadata?: Record<string, any>
+): AiCredential {
+  if (!dbInstance.ai_credentials[userId]) {
+    dbInstance.ai_credentials[userId] = [];
+  }
+
+  const now = new Date().toISOString();
+  const encryptedSecret = encryptSecret(apiKey.trim());
+  const maskedKey = maskSecret(apiKey.trim());
+
+  const existingIdx = dbInstance.ai_credentials[userId].findIndex(c => c.provider === provider);
+  const id = existingIdx >= 0 ? dbInstance.ai_credentials[userId][existingIdx].id : `cred_${Date.now()}_${crypto.randomBytes(4).toString('hex')}`;
+
+  const cred: StoredAiCredential = {
+    id,
+    userId,
+    provider,
+    credentialType: 'api_key',
+    maskedKey,
+    encryptedSecret,
+    status: 'valid',
+    metadata: metadata || {},
+    createdAt: existingIdx >= 0 ? dbInstance.ai_credentials[userId][existingIdx].createdAt : now,
+    updatedAt: now,
+  };
+
+  if (existingIdx >= 0) {
+    dbInstance.ai_credentials[userId][existingIdx] = cred;
+  } else {
+    dbInstance.ai_credentials[userId].push(cred);
+  }
+
+  saveDatabase(dbInstance);
+
+  // Return safe representation (without encryptedSecret)
+  const { encryptedSecret: _, ...safeCred } = cred;
+  return safeCred;
+}
+
+export function getAiCredentials(userId: string): AiCredential[] {
+  const list = dbInstance.ai_credentials[userId] || [];
+  return list.map(({ encryptedSecret: _, ...safe }) => safe);
+}
+
+export function getDecryptedAiCredential(userId: string, provider: AiProviderId): string | null {
+  const list = dbInstance.ai_credentials[userId] || [];
+  const found = list.find(c => c.provider === provider);
+  if (!found || !found.encryptedSecret) return null;
+  try {
+    return decryptSecret(found.encryptedSecret);
+  } catch (err) {
+    console.error(`Failed to decrypt AI credential for ${provider}:`, err);
+    return null;
+  }
+}
+
+export function markAiCredentialUsed(userId: string, provider: AiProviderId): void {
+  const list = dbInstance.ai_credentials[userId];
+  if (!list) return;
+  const found = list.find(c => c.provider === provider);
+  if (found) {
+    found.lastUsedAt = new Date().toISOString();
+    saveDatabase(dbInstance);
+  }
+}
+
+export function deleteAiCredential(userId: string, provider: AiProviderId): boolean {
+  if (!dbInstance.ai_credentials[userId]) return false;
+  const initialLen = dbInstance.ai_credentials[userId].length;
+  dbInstance.ai_credentials[userId] = dbInstance.ai_credentials[userId].filter(c => c.provider !== provider);
+  saveDatabase(dbInstance);
+  return dbInstance.ai_credentials[userId].length < initialLen;
+}
+
+// --- OAuth Connections ---
+export function saveOAuthConnection(
+  userId: string,
+  provider: string,
+  accessToken: string,
+  refreshToken?: string,
+  scopes: string[] = [],
+  expiresAt?: number,
+  accountEmail?: string,
+  metadata?: Record<string, any>
+): OAuthConnection {
+  if (!dbInstance.oauth_connections[userId]) {
+    dbInstance.oauth_connections[userId] = [];
+  }
+
+  const now = new Date().toISOString();
+  const encryptedAccessToken = encryptSecret(accessToken);
+  const encryptedRefreshToken = refreshToken ? encryptSecret(refreshToken) : undefined;
+
+  const existingIdx = dbInstance.oauth_connections[userId].findIndex(c => c.provider === provider);
+  const id = existingIdx >= 0 ? dbInstance.oauth_connections[userId][existingIdx].id : `oauth_${Date.now()}_${crypto.randomBytes(4).toString('hex')}`;
+
+  const conn: StoredOAuthConnection = {
+    id,
+    userId,
+    provider,
+    accountEmail,
+    scopes,
+    expiresAt,
+    status: 'connected',
+    metadata: metadata || {},
+    encryptedAccessToken,
+    encryptedRefreshToken,
+    createdAt: existingIdx >= 0 ? dbInstance.oauth_connections[userId][existingIdx].createdAt : now,
+    updatedAt: now,
+  };
+
+  if (existingIdx >= 0) {
+    dbInstance.oauth_connections[userId][existingIdx] = conn;
+  } else {
+    dbInstance.oauth_connections[userId].push(conn);
+  }
+
+  saveDatabase(dbInstance);
+
+  const { encryptedAccessToken: _1, encryptedRefreshToken: _2, ...safeConn } = conn;
+  return safeConn;
+}
+
+export function getUserOAuthConnections(userId: string): OAuthConnection[] {
+  const list = dbInstance.oauth_connections[userId] || [];
+  return list.map(({ encryptedAccessToken: _1, encryptedRefreshToken: _2, ...safe }) => safe);
+}
+
+export function getDecryptedOAuthToken(
+  userId: string, 
+  provider: string
+): { accessToken: string; refreshToken?: string } | null {
+  const list = dbInstance.oauth_connections[userId] || [];
+  const found = list.find(c => c.provider === provider);
+  if (!found || !found.encryptedAccessToken) return null;
+
+  try {
+    const accessToken = decryptSecret(found.encryptedAccessToken);
+    const refreshToken = found.encryptedRefreshToken ? decryptSecret(found.encryptedRefreshToken) : undefined;
+    return { accessToken, refreshToken };
+  } catch (err) {
+    console.error(`Failed to decrypt OAuth token for ${provider}:`, err);
+    return null;
+  }
+}
+
+export function disconnectOAuthConnection(userId: string, provider: string): boolean {
+  if (!dbInstance.oauth_connections[userId]) return false;
+  const initialLen = dbInstance.oauth_connections[userId].length;
+  dbInstance.oauth_connections[userId] = dbInstance.oauth_connections[userId].filter(c => c.provider !== provider);
+  saveDatabase(dbInstance);
+  return dbInstance.oauth_connections[userId].length < initialLen;
+}
+
+// --- AI Usage Tracking & Entitlements ---
+export function recordAiUsage(record: Omit<AiUsageRecord, 'id'>): AiUsageRecord {
+  const fullRecord: AiUsageRecord = {
+    ...record,
+    id: `usg_${Date.now()}_${crypto.randomBytes(4).toString('hex')}`,
+  };
+
+  if (!dbInstance.ai_usage[record.userId]) {
+    dbInstance.ai_usage[record.userId] = [];
+  }
+
+  dbInstance.ai_usage[record.userId].unshift(fullRecord);
+  // Cap at 1000 records per user
+  if (dbInstance.ai_usage[record.userId].length > 1000) {
+    dbInstance.ai_usage[record.userId] = dbInstance.ai_usage[record.userId].slice(0, 1000);
+  }
+
+  saveDatabase(dbInstance);
+  return fullRecord;
+}
+
+export function getUserAiUsage(userId: string): AiUsageRecord[] {
+  return dbInstance.ai_usage[userId] || [];
+}
+
+export function getUserAiEntitlement(userId: string): AiEntitlement {
+  const usageList = dbInstance.ai_usage[userId] || [];
+  
+  // Calculate current month's usage
+  const currentMonth = new Date().toISOString().slice(0, 7); // 'YYYY-MM'
+  const monthlyRecords = usageList.filter(u => u.timestamp.startsWith(currentMonth) && u.credentialSource === 'orbit');
+  
+  const currentUsageTokens = monthlyRecords.reduce((sum, r) => sum + (r.inputTokens || 0) + (r.outputTokens || 0), 0);
+  const monthlyAiLimit = 2_000_000; // 2 million tokens / month default Orbit entitlement
+
+  return {
+    plan: 'orbit_pro',
+    monthlyAiLimit,
+    currentUsageTokens,
+    remainingTokens: Math.max(0, monthlyAiLimit - currentUsageTokens),
+    allowedModels: [
+      'orbit-auto',
+      'gemini-2.5-pro',
+      'gemini-2.5-flash',
+      'gpt-4o',
+      'claude-3-5-sonnet',
+      'grok-2',
+      'deepseek-chat',
+    ],
+    byokAllowed: true,
+  };
+}
+
+// --- Tool Approvals ---
+export function createToolApproval(
+  approval: Omit<ToolApprovalRequest, 'id' | 'createdAt' | 'status'>
+): ToolApprovalRequest {
+  const id = `appr_${Date.now()}_${crypto.randomBytes(4).toString('hex')}`;
+  const record: ToolApprovalRequest = {
+    ...approval,
+    id,
+    status: 'pending',
+    createdAt: new Date().toISOString(),
+  };
+
+  dbInstance.tool_approvals[id] = record;
+  saveDatabase(dbInstance);
+  return record;
+}
+
+export function getToolApproval(id: string, userId: string): ToolApprovalRequest | undefined {
+  const record = dbInstance.tool_approvals[id];
+  if (!record || record.userId !== userId) return undefined;
+  return record;
+}
+
+export function updateToolApprovalStatus(
+  id: string,
+  userId: string,
+  status: 'approved' | 'rejected'
+): ToolApprovalRequest | undefined {
+  const record = dbInstance.tool_approvals[id];
+  if (!record || record.userId !== userId) return undefined;
+  record.status = status;
+  saveDatabase(dbInstance);
+  return record;
 }

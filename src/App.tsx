@@ -30,6 +30,12 @@ const AppContent: React.FC = () => {
         }
       });
     }
+
+    const handleSettingsNav = () => {
+      setCurrentView('settings');
+    };
+    window.addEventListener('orbit:navigate_settings', handleSettingsNav);
+    return () => window.removeEventListener('orbit:navigate_settings', handleSettingsNav);
   }, [user]);
 
   // Loading spinner while checking session

@@ -2,6 +2,8 @@ import React, { useState, useEffect } from 'react';
 import { useAuth } from '../../context/AuthContext.tsx';
 import { api } from '../../services/api.ts';
 import { requestGoogleSignIn, getStoredGoogleToken, storeGoogleToken } from '../../services/googleAuth.ts';
+import { AiProvidersSettings } from './AiProvidersSettings.tsx';
+import { AiUsageSettings } from './AiUsageSettings.tsx';
 import { 
   Settings, 
   User, 
@@ -34,13 +36,15 @@ import {
   ShieldCheck,
   ExternalLink,
   Loader2,
-  X
+  X,
+  Sparkles,
+  BarChart3
 } from 'lucide-react';
 import type { Integration, MemoryItem, UserSettings, IntegrationService } from '../../types/index.ts';
 
 export const SettingsView: React.FC = () => {
   const { user, refreshUser } = useAuth();
-  const [activeTab, setActiveTab] = useState<'account' | 'apps' | 'memory' | 'ai' | 'oauth'>('account');
+  const [activeTab, setActiveTab] = useState<'account' | 'apps' | 'ai_keys' | 'usage' | 'memory' | 'ai' | 'oauth'>('account');
 
   // Account form
   const [firstName, setFirstName] = useState(user?.firstName || '');
@@ -85,6 +89,14 @@ export const SettingsView: React.FC = () => {
     api.getIntegrations().then(res => res.integrations && setIntegrations(res.integrations));
     api.getMemories().then(res => res.memories && setMemories(res.memories));
     api.getSettings().then(res => res.settings && setAiSettings(res.settings));
+
+    const handleCustomNav = (e: any) => {
+      if (e.detail?.tab) {
+        setActiveTab(e.detail.tab);
+      }
+    };
+    window.addEventListener('orbit:navigate_settings', handleCustomNav);
+    return () => window.removeEventListener('orbit:navigate_settings', handleCustomNav);
   }, []);
 
   // Strict Account Validation
@@ -328,9 +340,11 @@ export const SettingsView: React.FC = () => {
         {[
           { id: 'account', label: 'Account Profile', icon: <User className="w-4 h-4" /> },
           { id: 'apps', label: 'Google & Workspace Apps', icon: <Layers className="w-4 h-4" /> },
-          { id: 'oauth', label: 'Manual OAuth & Keys', icon: <Key className="w-4 h-4" /> },
+          { id: 'ai_keys', label: 'AI Providers & BYOK', icon: <Sparkles className="w-4 h-4" /> },
+          { id: 'usage', label: 'AI Usage & Quota', icon: <BarChart3 className="w-4 h-4" /> },
           { id: 'memory', label: 'Memory Vault', icon: <Brain className="w-4 h-4" /> },
-          { id: 'ai', label: 'AI Intelligence', icon: <Sliders className="w-4 h-4" /> },
+          { id: 'ai', label: 'Behavior & Tone', icon: <Sliders className="w-4 h-4" /> },
+          { id: 'oauth', label: 'Workspace OAuth Keys', icon: <Key className="w-4 h-4" /> },
         ].map(tab => (
           <button
             key={tab.id}
@@ -529,6 +543,16 @@ export const SettingsView: React.FC = () => {
               })}
             </div>
           </div>
+        )}
+
+        {/* AI PROVIDERS & BYOK TAB */}
+        {activeTab === 'ai_keys' && (
+          <AiProvidersSettings />
+        )}
+
+        {/* AI USAGE & QUOTA TAB */}
+        {activeTab === 'usage' && (
+          <AiUsageSettings />
         )}
 
         {/* MANUAL OAUTH TAB */}

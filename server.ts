@@ -5,6 +5,7 @@ import multer from 'multer';
 import { createServer as createViteServer } from 'vite';
 import * as db from './server/db.ts';
 import { streamChatResponse, generateChatTitle, executeToolCall } from './server/ai.ts';
+import { SUPPORTED_MODELS } from './server/ai/providers.ts';
 import type { MessageAttachment, ChatMessage } from './src/types/index.ts';
 
 const app = express();
@@ -392,9 +393,86 @@ app.delete('/api/conversations/:id', requireAuth, (req: AuthRequest, res) => {
   res.json({ success: true });
 });
 
-// --- CHAT STREAMING WITH TOOL CALLING ---
+// --- AI MODELS, CREDENTIALS (BYOK), & USAGE ---
+app.get('/api/ai/models', (_req, res) => {
+  res.json({ models: db.getUserAiEntitlement('anonymous').allowedModels.length > 0 ? SUPPORTED_MODELS : [] });
+});
+
+app.get('/api/ai/credentials', requireAuth, (req: AuthRequest, res) => {
+  const credentials = db.getAiCredentials(req.userId!);
+  res.json({ credentials });
+});
+
+app.post('/api/ai/credentials', requireAuth, (req: AuthRequest, res) => {
+  const { provider, apiKey } = req.body;
+  if (!provider || !apiKey || typeof apiKey !== 'string' || apiKey.trim().length < 8) {
+    res.status(400).json({ error: 'A valid provider and API key are required.' });
+    return;
+  }
+
+  const validProviders = ['google', 'openai', 'anthropic', 'xai', 'deepseek', 'mistral'];
+  if (!validProviders.includes(provider)) {
+    res.status(400).json({ error: `Unsupported provider: ${provider}` });
+    return;
+  }
+
+  const credential = db.saveAiCredential(req.userId!, provider, apiKey.trim());
+  res.json({ success: true, credential });
+});
+
+app.delete('/api/ai/credentials/:provider', requireAuth, (req: AuthRequest, res) => {
+  const { provider } = req.params;
+  const deleted = db.deleteAiCredential(req.userId!, provider as any);
+  res.json({ success: deleted });
+});
+
+app.get('/api/ai/usage', requireAuth, (req: AuthRequest, res) => {
+  const usage = db.getUserAiUsage(req.userId!);
+  const entitlement = db.getUserAiEntitlement(req.userId!);
+  res.json({ usage, entitlement });
+});
+
+// --- OAUTH CONNECTIONS ---
+app.get('/api/oauth/connections', requireAuth, (req: AuthRequest, res) => {
+  const connections = db.getUserOAuthConnections(req.userId!);
+  res.json({ connections });
+});
+
+app.post('/api/oauth/connections', requireAuth, (req: AuthRequest, res) => {
+  const { provider, accessToken, refreshToken, scopes = [], expiresAt, accountEmail } = req.body;
+  if (!provider || !accessToken) {
+    res.status(400).json({ error: 'Provider and accessToken are required.' });
+    return;
+  }
+
+  const conn = db.saveOAuthConnection(
+    req.userId!,
+    provider,
+    accessToken,
+    refreshToken,
+    scopes,
+    expiresAt,
+    accountEmail
+  );
+
+  res.json({ success: true, connection: conn });
+});
+
+app.delete('/api/oauth/connections/:provider', requireAuth, (req: AuthRequest, res) => {
+  const { provider } = req.params;
+  const deleted = db.disconnectOAuthConnection(req.userId!, provider);
+  res.json({ success: deleted });
+});
+
+// --- CHAT STREAMING WITH VERCEL AI SDK 7 ---
 app.post('/api/chat/stream', requireAuth, async (req: AuthRequest, res) => {
-  const { conversationId, message, attachments = [] } = req.body;
+  const { 
+    conversationId, 
+    message, 
+    attachments = [], 
+    modelId = 'orbit-auto', 
+    credentialSource = 'orbit' 
+  } = req.body;
 
   if (!conversationId || !message) {
     res.status(400).json({ error: 'conversationId and message are required.' });
@@ -444,6 +522,8 @@ app.post('/api/chat/stream', requireAuth, async (req: AuthRequest, res) => {
       conversationId,
       message,
       attachments,
+      modelId,
+      credentialSource,
       (chunk) => {
         if (chunk.type === 'tool_call') {
           recordedToolCalls.push(chunk.payload);
@@ -453,6 +533,7 @@ app.post('/api/chat/stream', requireAuth, async (req: AuthRequest, res) => {
             match.result = chunk.payload.result;
             match.status = chunk.payload.requiresConfirmation ? 'pending' : 'executed';
             match.requiresConfirmation = chunk.payload.requiresConfirmation;
+            match.approvalId = chunk.payload.approvalId;
           }
         } else if (chunk.type === 'text' && chunk.content) {
           fullAssistantText += chunk.content;
@@ -484,8 +565,11 @@ app.post('/api/chat/stream', requireAuth, async (req: AuthRequest, res) => {
 
 // Tool action confirmation / execution endpoint
 app.post('/api/chat/tool/confirm', requireAuth, async (req: AuthRequest, res) => {
-  const { toolName, args } = req.body;
+  const { toolName, args, approvalId } = req.body;
   try {
+    if (approvalId) {
+      db.updateToolApprovalStatus(approvalId, req.userId!, 'approved');
+    }
     const result = await executeToolCall(req.userId!, toolName, { ...args, confirmed: true });
     res.json({ success: true, result: result.result });
   } catch (err: any) {
@@ -494,7 +578,7 @@ app.post('/api/chat/tool/confirm', requireAuth, async (req: AuthRequest, res) =>
 });
 
 // --- FILE UPLOADS ---
-app.post('/api/upload', requireAuth, upload.single('file'), (req: AuthRequest, res) => {
+app.post('/api/upload', requireAuth as any, upload.single('file') as any, (req: any, res: Response) => {
   const file = req.file;
   if (!file) {
     res.status(400).json({ error: 'No file provided.' });

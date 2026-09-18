@@ -95,6 +95,11 @@ export const ToolCallCard: React.FC<ToolCallCardProps> = ({ toolCall, onConfirmA
               <AlertTriangle className="w-3 h-3" />
               Confirmation Required
             </span>
+          ) : toolCall.result?.status === 'integration_required' ? (
+            <span className="inline-flex items-center gap-1 font-semibold text-[10px] text-indigo-700 bg-indigo-100/80 px-2 py-0.5 rounded-full">
+              <ExternalLink className="w-3 h-3" />
+              Connect App
+            </span>
           ) : toolCall.result ? (
             <span className="inline-flex items-center gap-1 font-semibold text-[10px] text-emerald-700 bg-emerald-100/80 px-2 py-0.5 rounded-full">
               <CheckCircle2 className="w-3 h-3" />
@@ -112,6 +117,26 @@ export const ToolCallCard: React.FC<ToolCallCardProps> = ({ toolCall, onConfirmA
           </button>
         </div>
       </div>
+
+      {/* Integration Required Notification */}
+      {toolCall.result?.status === 'integration_required' && (
+        <div className="px-4 py-3 border-t border-indigo-100 bg-indigo-50/60 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+          <div>
+            <p className="font-semibold text-slate-900">{toolCall.result.serviceName || 'Service'} is not connected yet</p>
+            <p className="text-[11px] text-slate-600 mt-0.5">{toolCall.result.message}</p>
+          </div>
+          <button
+            type="button"
+            onClick={() => {
+              window.dispatchEvent(new CustomEvent('orbit:navigate_settings', { detail: { tab: 'apps' } }));
+            }}
+            className="px-3 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white font-medium text-xs flex items-center gap-1.5 shadow-xs transition-all cursor-pointer flex-shrink-0"
+          >
+            <ExternalLink className="w-3.5 h-3.5" />
+            Connect {toolCall.result.serviceName || 'Service'}
+          </button>
+        </div>
+      )}
 
       {/* Confirmation Action Box */}
       {isPendingConfirmation && (

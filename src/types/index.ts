@@ -72,6 +72,7 @@ export interface ToolCallPayload {
   name: string;
   arguments: Record<string, any>;
   requiresConfirmation?: boolean;
+  approvalId?: string;
   status?: 'pending' | 'executed' | 'confirmed' | 'cancelled' | 'failed';
   result?: any;
 }
@@ -155,4 +156,90 @@ export interface UserSettings {
   emailNotifications: boolean;
   autoTitleEnabled: boolean;
   voiceInputLanguage: string;
+  defaultModel?: string;
+  defaultCredentialSource?: 'orbit' | 'byok';
+}
+
+export type AiProviderId = 'google' | 'openai' | 'anthropic' | 'xai' | 'deepseek' | 'mistral';
+
+export type CredentialSource = 'orbit' | 'byok';
+
+export interface AiModelInfo {
+  id: string;
+  name: string;
+  provider: AiProviderId;
+  description: string;
+  capabilities: {
+    tools: boolean;
+    vision: boolean;
+    reasoning: boolean;
+    streaming: boolean;
+  };
+  contextWindow: number;
+  isOrbitSupported: boolean;
+  isByokSupported: boolean;
+  tier: 'fast' | 'standard' | 'reasoning' | 'pro';
+}
+
+export interface AiCredential {
+  id: string;
+  userId: string;
+  provider: AiProviderId;
+  credentialType: 'api_key';
+  maskedKey: string;
+  status: 'valid' | 'invalid' | 'untested';
+  metadata?: Record<string, any>;
+  createdAt: string;
+  updatedAt: string;
+  lastUsedAt?: string;
+}
+
+export interface OAuthConnection {
+  id: string;
+  userId: string;
+  provider: string;
+  accountEmail?: string;
+  scopes: string[];
+  expiresAt?: number;
+  status: 'connected' | 'expired' | 'revoked';
+  metadata?: Record<string, any>;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface AiUsageRecord {
+  id: string;
+  userId: string;
+  conversationId?: string;
+  provider: string;
+  modelId: string;
+  credentialSource: CredentialSource;
+  inputTokens: number;
+  outputTokens: number;
+  cachedTokens?: number;
+  estimatedCost: number;
+  timestamp: string;
+  status: 'success' | 'failed';
+}
+
+export interface ToolApprovalRequest {
+  id: string;
+  userId: string;
+  conversationId: string;
+  toolCallId: string;
+  toolName: string;
+  actionType: string;
+  actionDescription: string;
+  parameters: Record<string, any>;
+  status: 'pending' | 'approved' | 'rejected';
+  createdAt: string;
+}
+
+export interface AiEntitlement {
+  plan: 'orbit_starter' | 'orbit_pro' | 'orbit_team';
+  monthlyAiLimit: number;
+  currentUsageTokens: number;
+  remainingTokens: number;
+  allowedModels: string[];
+  byokAllowed: boolean;
 }

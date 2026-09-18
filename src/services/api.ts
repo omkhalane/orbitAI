@@ -344,11 +344,82 @@ export const api = {
   },
 
   // Tool Confirmation
-  async confirmToolAction(toolName: string, args: Record<string, any>): Promise<{ success: boolean; result: any }> {
+  async confirmToolAction(toolName: string, args: Record<string, any>, approvalId?: string): Promise<{ success: boolean; result: any }> {
     const res = await fetch(`${API_BASE}/chat/tool/confirm`, {
       method: 'POST',
       headers: getAuthHeaders(),
-      body: JSON.stringify({ toolName, args }),
+      body: JSON.stringify({ toolName, args, approvalId }),
+    });
+    return res.json();
+  },
+
+  // AI Models, Credentials & Usage
+  async getAiModels(): Promise<{ models: any[] }> {
+    const res = await fetch(`${API_BASE}/ai/models`, {
+      headers: getAuthHeaders(),
+    });
+    return res.json();
+  },
+
+  async getAiCredentials(): Promise<{ credentials: any[] }> {
+    const res = await fetch(`${API_BASE}/ai/credentials`, {
+      headers: getAuthHeaders(),
+    });
+    return res.json();
+  },
+
+  async saveAiCredential(provider: string, apiKey: string): Promise<{ success: boolean; credential: any; error?: string }> {
+    const res = await fetch(`${API_BASE}/ai/credentials`, {
+      method: 'POST',
+      headers: getAuthHeaders(),
+      body: JSON.stringify({ provider, apiKey }),
+    });
+    return res.json();
+  },
+
+  async deleteAiCredential(provider: string): Promise<{ success: boolean }> {
+    const res = await fetch(`${API_BASE}/ai/credentials/${provider}`, {
+      method: 'DELETE',
+      headers: getAuthHeaders(),
+    });
+    return res.json();
+  },
+
+  async getAiUsage(): Promise<{ usage: any[]; entitlement: any }> {
+    const res = await fetch(`${API_BASE}/ai/usage`, {
+      headers: getAuthHeaders(),
+    });
+    return res.json();
+  },
+
+  // OAuth Connections
+  async getOAuthConnections(): Promise<{ connections: any[] }> {
+    const res = await fetch(`${API_BASE}/oauth/connections`, {
+      headers: getAuthHeaders(),
+    });
+    return res.json();
+  },
+
+  async saveOAuthConnection(payload: {
+    provider: string;
+    accessToken: string;
+    refreshToken?: string;
+    scopes?: string[];
+    expiresAt?: number;
+    accountEmail?: string;
+  }): Promise<{ success: boolean; connection: any }> {
+    const res = await fetch(`${API_BASE}/oauth/connections`, {
+      method: 'POST',
+      headers: getAuthHeaders(),
+      body: JSON.stringify(payload),
+    });
+    return res.json();
+  },
+
+  async disconnectOAuthConnection(provider: string): Promise<{ success: boolean }> {
+    const res = await fetch(`${API_BASE}/oauth/connections/${provider}`, {
+      method: 'DELETE',
+      headers: getAuthHeaders(),
     });
     return res.json();
   },
